@@ -31,8 +31,8 @@ EP_GET_QR_STATUS = "ilink/bot/get_qrcode_status"
 EP_GET_UPDATES = "ilink/bot/getupdates"
 EP_SEND_MESSAGE = "ilink/bot/sendmessage"
 
-LONG_POLL_TIMEOUT_MS = 35_000
-API_TIMEOUT_MS = 15_000
+LONG_POLL_TIMEOUT_MS = 5_000  # 短轮询，方便调试（稳定后可改回 35_000）
+API_TIMEOUT_MS = 10_000
 QR_TIMEOUT_MS = 35_000
 
 MSG_TYPE_USER = 1
@@ -86,14 +86,14 @@ class WeChatChannel(Channel):
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
     async def _api_post(self, endpoint: str, payload: dict, timeout_ms: int = API_TIMEOUT_MS) -> dict:
-        """调用 iLink Bot API (POST)"""
+        """调用 iLink Bot API (POST) — 只用 asyncio.wait_for 控制超时"""
         await self._ensure_session()
         body = self._json_dumps({**payload, "base_info": self._base_info()})
         url = f"{self.base_url}/{endpoint}"
 
         async def _do() -> dict:
             async with self._session.post(
-                url, data=body, headers=self._headers(body), timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000)
+                url, data=body, headers=self._headers(body)
             ) as resp:
                 raw = await resp.text()
                 if not resp.ok:
@@ -103,7 +103,7 @@ class WeChatChannel(Channel):
         return await asyncio.wait_for(_do(), timeout=timeout_ms / 1000 + 5)
 
     async def _api_get(self, endpoint: str, timeout_ms: int = QR_TIMEOUT_MS) -> dict:
-        """调用 iLink Bot API (GET) — 用于二维码流"""
+        """调用 iLink Bot API (GET) — 只用 asyncio.wait_for 控制超时"""
         await self._ensure_session()
         url = f"{self.base_url}/{endpoint}"
         headers = {
@@ -112,7 +112,7 @@ class WeChatChannel(Channel):
         }
 
         async def _do() -> dict:
-            async with self._session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000)) as resp:
+            async with self._session.get(url, headers=headers) as resp:
                 raw = await resp.text()
                 if not resp.ok:
                     raise RuntimeError(f"iLink GET {endpoint} HTTP {resp.status}: {raw[:200]}")
