@@ -45,7 +45,7 @@ cp .env.example .env
 # 方式 B：使用环境变量
 # export LLM_API_KEY="sk-..."
 # export LLM_BASE_URL="https://api.deepseek.com/v1"
-# export LLM_MODEL="deepseek-chat"
+# export LLM_MODEL="deepseek-v4-flash"
 
 # 3. 运行
 mini-agent
@@ -59,7 +59,10 @@ mini-agent
 # DeepSeek（默认配置）
 LLM_API_KEY="sk-..."
 LLM_BASE_URL="https://api.deepseek.com/v1"
-LLM_MODEL="deepseek-chat"
+LLM_MODEL="deepseek-v4-flash"
+
+# DeepSeek Pro（更强推理）
+# LLM_MODEL="deepseek-v4-pro"
 
 # Ollama 本地
 LLM_API_KEY="ollama"

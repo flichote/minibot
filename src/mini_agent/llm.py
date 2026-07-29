@@ -27,7 +27,7 @@ class LLM:
     ):
         self.api_key = api_key or os.environ.get("LLM_API_KEY") or self._load_key()
         self.base_url = (base_url or os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
-        self.model = model or os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        self.model = model or os.environ.get("LLM_MODEL", "deepseek-v4-flash")
 
     def _load_key(self) -> str:
         """尝试从 ~/.llm_key 读取 API Key"""
