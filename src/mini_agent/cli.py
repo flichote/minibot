@@ -75,6 +75,11 @@ def main():
         _run_gateway()
         return
 
+    # 诊断模式
+    if len(sys.argv) > 1 and sys.argv[1] in ("diag", "diagnostic", "test"):
+        _run_diag()
+        return
+
     agent = build_agent()
 
     print(BANNER)
@@ -113,6 +118,18 @@ def _run_gateway():
         print("\n  网关已停止。")
     except Exception as e:
         print(f"❌ 网关异常: {type(e).__name__}: {e}")
+        sys.exit(1)
+
+
+def _run_diag():
+    """运行微信连接诊断"""
+    load_dotenv()
+    try:
+        from .gateway import run_diagnostic
+        asyncio.run(run_diagnostic())
+    except ImportError as e:
+        print(f"❌ 诊断依赖缺失: {e}")
+        print("   安装: pip install aiohttp")
         sys.exit(1)
 
 
