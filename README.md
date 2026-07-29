@@ -72,6 +72,52 @@ LLM_BASE_URL="https://api.anthropic.com/v1"
 LLM_MODEL="claude-sonnet-4-20250514"
 ```
 
+## 🌐 网关模式（连接微信）
+
+minibot 支持通过网关连接即时通讯平台，目前支持 **微信（iLink Bot API）**。
+
+### 安装依赖
+
+```bash
+pip install minibot[wechat]
+```
+
+### 配置
+
+在 `.env` 中添加微信配置（首次运行会自动扫码登录并保存凭证）：
+
+```bash
+# 微信通道配置
+WECHAT_ACCOUNT_ID=       # 首次扫码后自动填入
+WECHAT_TOKEN=            # 首次扫码后自动填入
+WECHAT_BASE_URL=https://ilinkai.weixin.qq.com
+WECHAT_DM_POLICY=open    # open=允许所有人, allowlist=白名单, disabled=关闭
+WECHAT_ALLOWED_USERS=    # 白名单用户ID（逗号分隔，仅 allowlist 模式需要）
+
+# 网关通道列表
+GATEWAY_CHANNELS=wechat
+```
+
+### 启动网关
+
+```bash
+mini-agent gateway
+# 或
+python -m mini_agent gateway
+```
+
+首次启动会显示二维码，用微信扫码即可登录。后续启动会自动复用保存的凭证。
+
+### 架构
+
+```
+微信 ──→ WeChatChannel ──→ Agent ──→ LLM
+  ↑                          │
+  └──── 回复 ←───────────────┘
+```
+
+消息流：微信消息 → 网关 → Agent 处理 → LLM 回复 → 发回微信
+
 ## 项目结构
 
 ```
@@ -84,12 +130,16 @@ minibot/
 │   └── mini_agent/
 │       ├── __init__.py     # 统一导出
 │       ├── __main__.py     # python -m mini_agent 入口
+│       ├── cli.py          # CLI 交互 + gateway 子命令
 │       ├── core.py         # 🔥 Agent 核心循环 (~90 行)
 │       ├── dotenv.py       # .env 文件加载器 (~50 行)
+│       ├── gateway.py      # 🌐 网关运行器 (~100 行)
 │       ├── llm.py          # LLM API 调用 (~60 行)
 │       ├── tools.py        # 工具注册系统 (~80 行)
 │       ├── memory.py       # 记忆存储 (~50 行)
-│       └── cli.py          # 终端交互 (~80 行)
+│       └── channels/
+│           ├── __init__.py  # 通道基类
+│           └── wechat.py    # 📱 微信通道 (~250 行)
 └── examples/
     └── custom_tools.py     # 扩展工具示例
 ```

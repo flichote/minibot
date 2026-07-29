@@ -2,6 +2,7 @@
 提供 `mini-agent` 命令和 `python -m mini_agent` 两种启动方式。
 """
 
+import asyncio
 import os
 import sys
 
@@ -68,6 +69,12 @@ BANNER = r"""
 def main():
     """CLI 入口函数"""
     load_dotenv()
+
+    # 网关模式
+    if len(sys.argv) > 1 and sys.argv[1] in ("gateway", "gw"):
+        _run_gateway()
+        return
+
     agent = build_agent()
 
     print(BANNER)
@@ -91,6 +98,22 @@ def main():
         response = agent.run(user_input)
         print(f"  🤖 {response}")
         print()
+
+
+def _run_gateway():
+    """启动网关模式"""
+    try:
+        from .gateway import run_gateway
+        asyncio.run(run_gateway())
+    except ImportError as e:
+        print(f"❌ 网关依赖缺失: {e}")
+        print("   安装: pip install aiohttp")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n  网关已停止。")
+    except Exception as e:
+        print(f"❌ 网关异常: {type(e).__name__}: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
