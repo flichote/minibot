@@ -1,6 +1,6 @@
-# Mini Agent
+# minibot
 
-🐱 极简 AI Agent 框架 — **零外部依赖**，核心约 **400 行** Python。
+🐱 极简 AI Agent 框架 — **零外部依赖**，核心约 **500 行** Python。
 
 ## 设计哲学
 
@@ -16,9 +16,9 @@
 
 ## 为什么自己造轮子
 
-| 对比 | nanobot (46k ⭐) | 这个 Mini Agent |
-|------|-----------------|-----------------|
-| 代码量 | 数万行 + WebUI | ~400 行纯 Python |
+| 对比 | nanobot (46k ⭐) | **minibot** |
+|------|-----------------|-------------|
+| 代码量 | 数万行 + WebUI | ~500 行纯 Python |
 | 外部依赖 | httpx, fastapi 等 | **0**（只用标准库） |
 | 数据库 | 有 | JSON 文件 |
 | 学习成本 | 看半天源码 | 15 分钟读完 |
@@ -28,8 +28,9 @@
 ## 快速开始
 
 ```bash
-# 1. 安装（pip 可安装模式）
-cd ~/hermes-workspace/mini-agent
+# 1. 克隆 & 安装
+git clone https://github.com/flichote/minibot.git
+cd minibot
 pip install -e .
 
 # 2. 设置你的 API Key
@@ -58,7 +59,7 @@ export LLM_BASE_URL="https://api.anthropic.com/v1" LLM_MODEL="claude-sonnet-4-20
 ## 项目结构
 
 ```
-mini-agent/
+minibot/
 ├── pyproject.toml          # 项目元数据
 ├── README.md               # 本文件
 ├── .gitignore
