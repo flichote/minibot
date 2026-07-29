@@ -36,7 +36,7 @@ class LLM:
             with open(key_file) as f:
                 return f.read().strip()
         raise ValueError(
-            "请设置 LLM_API_KEY 环境变量，或创建 ~/.llm_key 文件"
+            "请设置 LLM_API_KEY 环境变量，或在项目根目录创建 .env 文件"
         )
 
     def chat(self, messages: list, tools: list | None = None) -> LLMReply:

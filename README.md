@@ -33,9 +33,19 @@ git clone https://github.com/flichote/minibot.git
 cd minibot
 pip install -e .
 
-# 2. 设置你的 API Key
-export LLM_API_KEY="sk-..."
-export LLM_MODEL="gpt-4o-mini"          # 或其他模型
+# 2. 配置 API Key（二选一）
+#
+# 方式 A：使用 .env 文件（推荐）
+cp .env.example .env
+# 然后编辑 .env 填入你的 API Key:
+#   LLM_API_KEY="sk-..."
+#   LLM_BASE_URL="https://api.deepseek.com/v1"
+#   LLM_MODEL="deepseek-chat"
+#
+# 方式 B：使用环境变量
+# export LLM_API_KEY="sk-..."
+# export LLM_BASE_URL="https://api.deepseek.com/v1"
+# export LLM_MODEL="deepseek-chat"
 
 # 3. 运行
 mini-agent
@@ -43,31 +53,39 @@ mini-agent
 
 ### 支持的 Provider
 
-换环境变量就行，无需改代码：
+换环境变量就行，无需改代码。编辑 `.env` 文件即可切换：
 
 ```bash
-# DeepSeek
-export LLM_BASE_URL="https://api.deepseek.com/v1" LLM_MODEL="deepseek-chat"
+# DeepSeek（默认配置）
+LLM_API_KEY="sk-..."
+LLM_BASE_URL="https://api.deepseek.com/v1"
+LLM_MODEL="deepseek-chat"
 
 # Ollama 本地
-export LLM_BASE_URL="http://localhost:11434/v1" LLM_MODEL="qwen2.5"
+LLM_API_KEY="ollama"
+LLM_BASE_URL="http://localhost:11434/v1"
+LLM_MODEL="qwen2.5"
 
 # Claude
-export LLM_BASE_URL="https://api.anthropic.com/v1" LLM_MODEL="claude-sonnet-4-20250514"
+LLM_API_KEY="sk-ant-..."
+LLM_BASE_URL="https://api.anthropic.com/v1"
+LLM_MODEL="claude-sonnet-4-20250514"
 ```
 
 ## 项目结构
 
 ```
 minibot/
-├── pyproject.toml          # 项目元数据
-├── README.md               # 本文件
+├── .env.example             # 配置模板（复制为 .env 使用）
 ├── .gitignore
+├── pyproject.toml           # 项目元数据
+├── README.md                # 本文件
 ├── src/
 │   └── mini_agent/
 │       ├── __init__.py     # 统一导出
 │       ├── __main__.py     # python -m mini_agent 入口
 │       ├── core.py         # 🔥 Agent 核心循环 (~90 行)
+│       ├── dotenv.py       # .env 文件加载器 (~50 行)
 │       ├── llm.py          # LLM API 调用 (~60 行)
 │       ├── tools.py        # 工具注册系统 (~80 行)
 │       ├── memory.py       # 记忆存储 (~50 行)

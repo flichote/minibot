@@ -5,6 +5,7 @@
 import os
 import sys
 
+from .dotenv import load_dotenv
 from .core import Agent
 
 
@@ -66,6 +67,7 @@ BANNER = r"""
 
 def main():
     """CLI 入口函数"""
+    load_dotenv()
     agent = build_agent()
 
     print(BANNER)
