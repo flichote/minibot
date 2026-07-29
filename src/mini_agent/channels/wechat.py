@@ -86,7 +86,7 @@ class WeChatChannel(Channel):
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
     async def _api_post(self, endpoint: str, payload: dict, timeout_ms: int = API_TIMEOUT_MS) -> dict:
-        """调用 iLink Bot API"""
+        """调用 iLink Bot API (POST)"""
         await self._ensure_session()
         body = self._json_dumps({**payload, "base_info": self._base_info()})
         url = f"{self.base_url}/{endpoint}"
@@ -102,6 +102,24 @@ class WeChatChannel(Channel):
 
         return await asyncio.wait_for(_do(), timeout=timeout_ms / 1000 + 5)
 
+    async def _api_get(self, endpoint: str, timeout_ms: int = QR_TIMEOUT_MS) -> dict:
+        """调用 iLink Bot API (GET) — 用于二维码流"""
+        await self._ensure_session()
+        url = f"{self.base_url}/{endpoint}"
+        headers = {
+            "iLink-App-Id": ILINK_APP_ID,
+            "iLink-App-ClientVersion": str(ILINK_APP_CLIENT_VERSION),
+        }
+
+        async def _do() -> dict:
+            async with self._session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000)) as resp:
+                raw = await resp.text()
+                if not resp.ok:
+                    raise RuntimeError(f"iLink GET {endpoint} HTTP {resp.status}: {raw[:200]}")
+                return json.loads(raw)
+
+        return await asyncio.wait_for(_do(), timeout=timeout_ms / 1000 + 5)
+
     # ── 登录流程 ───────────────────────────────────
 
     async def _login(self):
@@ -110,52 +128,75 @@ class WeChatChannel(Channel):
         print("─" * 40)
 
         try:
-            data = await self._api_post(EP_GET_BOT_QR, {}, timeout_ms=QR_TIMEOUT_MS)
+            data = await self._api_get(f"{EP_GET_BOT_QR}?bot_type=3", timeout_ms=QR_TIMEOUT_MS)
         except Exception as e:
             print(f"❌ 获取二维码失败: {e}")
             return False
 
-        qr_url = data.get("qrcode_url") or data.get("url", "")
-        qr_session = data.get("session_id") or data.get("qrcode_session", "")
+        qrcode_value = str(data.get("qrcode") or "")
+        qrcode_url = str(data.get("qrcode_img_content") or "")
 
-        if not qr_url:
+        if not qrcode_value:
             print(f"❌ 二维码数据异常: {json.dumps(data, ensure_ascii=False)[:200]}")
             return False
 
-        # 显示二维码
-        print(f"🔗 请用微信扫码:\n   {qr_url}")
+        # 优先使用完整的扫码 URL
+        qr_scan_data = qrcode_url if qrcode_url else qrcode_value
+        print(f"🔗 请用微信扫码:\n   {qr_scan_data}")
         print(f"\n⏳ 等待扫码...")
 
         # 轮询扫码状态
+        refresh_count = 0
         for _ in range(120):
             await asyncio.sleep(2)
             try:
-                status_data = await self._api_post(
-                    EP_GET_QR_STATUS,
-                    {"qrcode_session": qr_session} if qr_session else {"qrcode_url": qr_url},
+                status_data = await self._api_get(
+                    f"{EP_GET_QR_STATUS}?qrcode={qrcode_value}",
                     timeout_ms=QR_TIMEOUT_MS,
                 )
             except Exception:
                 continue
 
-            state = status_data.get("status", "")
-            if state == "scanned":
-                print("✅ 已扫码，等待确认...")
-            elif state in ("confirmed", "success"):
-                self.account_id = status_data.get("account_id", "")
-                self.token = status_data.get("token", "")
+            status = str(status_data.get("status", "wait"))
+
+            if status == "wait":
+                print(".", end="", flush=True)
+            elif status == "scaned":
+                print("\n✅ 已扫码，请在手机上确认...")
+            elif status == "scaned_but_redirect":
+                redirect_host = str(status_data.get("redirect_host", ""))
+                if redirect_host:
+                    self.base_url = f"https://{redirect_host}"
+                print(f"\n↪️ 重定向到 {redirect_host}")
+            elif status == "expired":
+                refresh_count += 1
+                if refresh_count > 3:
+                    print("\n❌ 二维码多次过期")
+                    return False
+                print(f"\n🔄 二维码过期，刷新中 ({refresh_count}/3)...")
+                try:
+                    data = await self._api_get(f"{EP_GET_BOT_QR}?bot_type=3", timeout_ms=QR_TIMEOUT_MS)
+                    qrcode_value = str(data.get("qrcode", ""))
+                    qrcode_url = str(data.get("qrcode_img_content", ""))
+                    qr_scan_data = qrcode_url if qrcode_url else qrcode_value
+                    print(f"   {qr_scan_data}")
+                except Exception:
+                    pass
+            elif status == "confirmed":
+                self.account_id = str(status_data.get("ilink_bot_id", ""))
+                self.token = str(status_data.get("bot_token", ""))
+                base_url = str(status_data.get("baseurl", ILINK_BASE_URL))
+                if base_url:
+                    self.base_url = base_url
                 if self.account_id and self.token:
-                    print(f"✅ 微信登录成功！账号: {self.account_id}")
+                    print(f"\n✅ 微信登录成功！账号: {self.account_id}")
                     self._save_creds()
                     return True
                 else:
-                    print(f"⚠️ 登录响应异常: {json.dumps(status_data, ensure_ascii=False)[:200]}")
+                    print(f"\n⚠️ 登录响应异常: {json.dumps(status_data, ensure_ascii=False)[:200]}")
                     return False
-            elif state in ("expired", "cancel"):
-                print("❌ 二维码已过期")
-                return False
 
-        print("❌ 登录超时")
+        print("\n❌ 登录超时")
         return False
 
     def _save_creds(self):
