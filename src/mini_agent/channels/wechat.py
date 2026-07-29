@@ -98,7 +98,11 @@ class WeChatChannel(Channel):
                 raw = await resp.text()
                 if not resp.ok:
                     raise RuntimeError(f"iLink POST {endpoint} HTTP {resp.status}: {raw[:200]}")
-                return json.loads(raw)
+                try:
+                    return json.loads(raw)
+                except json.JSONDecodeError:
+                    print(f"  ⚠️ [{datetime.now():%H:%M:%S}] API 返回非 JSON: {raw[:200]}")
+                    return {"ret": -1, "msgs": []}
 
         return await asyncio.wait_for(_do(), timeout=timeout_ms / 1000 + 5)
 
