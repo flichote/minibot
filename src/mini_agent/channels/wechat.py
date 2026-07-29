@@ -242,10 +242,16 @@ class WeChatChannel(Channel):
     async def _poll_messages(self):
         """长轮询获取消息"""
         print(f"🔗 开始接收微信消息...")
+        print(f"   (长轮询每 35 秒检查一次，有新消息会自动显示)")
         consecutive_failures = 0
+        poll_count = 0
 
         while self._running:
+            poll_count += 1
             try:
+                if poll_count <= 3 or poll_count % 10 == 0:
+                    print(f"  📡 [{datetime.now():%H:%M:%S}] 轮询 #{poll_count}...", flush=True)
+
                 data = await self._api_post(
                     EP_GET_UPDATES,
                     {"get_updates_buf": self._sync_buf},
@@ -253,19 +259,33 @@ class WeChatChannel(Channel):
                 )
 
                 consecutive_failures = 0
-                self._sync_buf = data.get("get_updates_buf", self._sync_buf)
-                msgs = data.get("msgs", data.get("messages", []))
 
-                for msg in msgs:
-                    await self._handle_message(msg)
+                # 更新同步缓存
+                new_buf = str(data.get("get_updates_buf") or "")
+                if new_buf:
+                    self._sync_buf = new_buf
+
+                ret = data.get("ret", 0)
+                errcode = data.get("errcode", 0)
+                if ret not in (0, None) or errcode not in (0, None):
+                    if poll_count <= 3:
+                        print(f"  ⚠️ [{datetime.now():%H:%M:%S}] API 返回: ret={ret} errcode={errcode} msg={data.get('errmsg','')}")
+                    continue
+
+                msgs = data.get("msgs") or []
+                if msgs:
+                    print(f"\n📨 [{datetime.now():%H:%M:%S}] 收到 {len(msgs)} 条消息!")
+                    for msg in msgs:
+                        await self._handle_message(msg)
 
             except asyncio.TimeoutError:
-                # 长轮询超时是正常的
+                # 长轮询超时是正常的 — 没有新消息
                 consecutive_failures = 0
                 continue
             except Exception as e:
                 consecutive_failures += 1
-                print(f"  ⚠️ 消息轮询异常: {type(e).__name__}")
+                if poll_count <= 5 or consecutive_failures >= 3:
+                    print(f"  ⚠️ [{datetime.now():%H:%M:%S}] 轮询异常 ({consecutive_failures}/5): {type(e).__name__}")
                 if consecutive_failures >= 5:
                     print("❌ 连续失败过多，停止轮询")
                     break
