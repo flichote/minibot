@@ -19,14 +19,13 @@ async def _route_message(
     text: str,
 ) -> str | None:
     """消息路由：通道消息 → Agent → 回复"""
-    # 忽略空消息
     text = text.strip()
     if not text:
         return None
 
-    # 构建上下文，让 Agent 知道来自哪个平台
     context = f"[来自 {channel_name} 用户 {user_id}]\n{text}"
-    reply = agent.run(context)
+    loop = asyncio.get_event_loop()
+    reply = await loop.run_in_executor(None, agent.run, context)
     return reply
 
 
