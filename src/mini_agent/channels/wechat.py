@@ -249,8 +249,7 @@ class WeChatChannel(Channel):
         while self._running:
             poll_count += 1
             try:
-                if poll_count <= 3 or poll_count % 10 == 0:
-                    print(f"  📡 [{datetime.now():%H:%M:%S}] 轮询 #{poll_count}...", flush=True)
+                print(f"  📡 [{datetime.now():%H:%M:%S}] 轮询 #{poll_count}...", flush=True)
 
                 data = await self._api_post(
                     EP_GET_UPDATES,
@@ -267,9 +266,9 @@ class WeChatChannel(Channel):
 
                 ret = data.get("ret", 0)
                 errcode = data.get("errcode", 0)
+
                 if ret not in (0, None) or errcode not in (0, None):
-                    if poll_count <= 3:
-                        print(f"  ⚠️ [{datetime.now():%H:%M:%S}] API 返回: ret={ret} errcode={errcode} msg={data.get('errmsg','')}")
+                    print(f"  ⚠️ [{datetime.now():%H:%M:%S}] API ret={ret} errcode={errcode}: {data.get('errmsg','')}")
                     continue
 
                 msgs = data.get("msgs") or []
@@ -277,6 +276,9 @@ class WeChatChannel(Channel):
                     print(f"\n📨 [{datetime.now():%H:%M:%S}] 收到 {len(msgs)} 条消息!")
                     for msg in msgs:
                         await self._handle_message(msg)
+                else:
+                    # 正常轮询无消息
+                    pass
 
             except asyncio.TimeoutError:
                 # 长轮询超时是正常的 — 没有新消息
@@ -292,32 +294,40 @@ class WeChatChannel(Channel):
                 await asyncio.sleep(3)
 
     async def _handle_message(self, msg: dict):
-        """处理单条消息"""
-        msg_type = msg.get("msg_type", msg.get("type", 0))
-        if msg_type != MSG_TYPE_USER:
-            return  # 只处理用户发来的消息
+        """处理单条消息 — 宽松解析，适用于各种 iLink 消息格式"""
+        try:
+            # 消息发送者
+            from_user = str(msg.get("from_user_id") or "").strip()
+            if not from_user:
+                return
 
-        from_user = msg.get("from_user_id") or msg.get("from", "")
-        content = ""
-        items = msg.get("item_list", msg.get("items", []))
-        for item in items:
-            if item.get("type") == ITEM_TEXT:
-                text_item = item.get("text_item", item.get("text", {}))
-                content = text_item.get("text", "")
+            # 提取文本内容
+            content = ""
+            item_list = msg.get("item_list") or []
+            for item in item_list:
+                item_type = item.get("type")
+                if item_type == ITEM_TEXT:
+                    text_item = item.get("text_item") or {}
+                    content = str(text_item.get("text") or "")
 
-        if not content or not from_user:
-            return
+            if not content:
+                return  # 非文本消息（图片、语音等）暂不处理
 
-        # 检查 DM 策略
-        if not self._check_dm_policy(from_user):
-            return
+            # 检查 DM 策略
+            if not self._check_dm_policy(from_user):
+                print(f"  ⛔ 拒绝: {from_user} (DM 策略={self.dm_policy})")
+                return
 
-        print(f"\n📩 [{datetime.now():%H:%M:%S}] {from_user}: {content[:80]}")
+            print(f"\n📩 [{datetime.now():%H:%M:%S}] {from_user}: {content[:80]}")
 
-        if self._on_message:
-            reply = await self._on_message("wechat", from_user, content)
-            if reply:
-                await self.send(from_user, reply)
+            if self._on_message:
+                reply = await self._on_message("wechat", from_user, content)
+                if reply:
+                    await self.send(from_user, reply)
+                    print(f"  ✅ 已回复: {reply[:60]}...")
+
+        except Exception as e:
+            print(f"  ⚠️ 消息处理异常: {type(e).__name__}: {e}")
 
     def _check_dm_policy(self, user_id: str) -> bool:
         if self.dm_policy == "open":
