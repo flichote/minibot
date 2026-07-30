@@ -34,10 +34,16 @@ class Agent:
         # 1. 初始化会话消息
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
-        # 2. 注入记忆上下文
-        context = self.memory.load_recent(limit=5)
-        if context:
-            self.messages[0]["content"] += f"\n\n近期记忆：\n{context}"
+        # 2. 注入记忆上下文 — 分类注入
+        facts = self.memory.get_facts()
+        context_parts = []
+        if facts:
+            context_parts.append(f"已知信息：\n{facts}")
+        recent = self.memory.load_recent(limit=4)
+        if recent:
+            context_parts.append(f"近期对话：\n{recent}")
+        if context_parts:
+            self.messages[0]["content"] += "\n\n" + "\n\n".join(context_parts)
 
         # 3. 用户输入入队
         self.messages.append({"role": "user", "content": user_input})
